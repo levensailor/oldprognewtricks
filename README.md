@@ -25,9 +25,10 @@ Starting app on port 5000
 
 #### 4. Create ngrok tunnel
 ##### https://ngrok.com
-Download for Mac OS and unzip to /usr/local/bin
-Add authtoken
-Run, forwarding http to port 5000
+- Download for Mac OS
+- Unzip to local path, ie: /usr/local/bin
+- Add authtoken
+- Run ngrok to forward http to port 5000
 ```
 $ unzip /path/to/ngrok.zip -d /usr/local/bin/
 $ ./ngrok authtoken 37eroiNyyQKWiyvj1Sx4b_64GfspoBskoWtAew7d2Be
