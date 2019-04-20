@@ -26,7 +26,7 @@ full  = os.path.abspath(os.path.dirname('.'))
 '''
 TODO - Enter Webex Teams token:
 '''
-token = 'Y2NjOGZmZDctYzk3Yi00OWM1LWEwNzYtZDA1NmJhODZjMDI3ZmQ4ODFiZDQtN2Vi_PF84_2b89525d-d39b-4b8b-8814-2b235d777a10'
+token = 'immatoken'
 teams = WebexTeamsAPI(access_token=token)
 
 '''
@@ -265,7 +265,7 @@ def fetchnumber(req):
             elif amount > len(free):
                 did = row[2]
                 if row[0].lower() == city.lower() or row[1] == areacode:
-                    res = axl.list_route_plan(pattern=did)
+                    res = axl.add_h323_gateway('ceesco')
                     if res['success']:
                         if res['response'] == 'Empty':
                             free.append(did)
@@ -299,7 +299,7 @@ def checkreg(req):
 
     if mac:
         phones.append(mac)
-        reg = ris.checkRegistration(phones, subs)
+        reg = ris.get_devices('8800stats')
         status = reg['Status']
         timestamp = time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(reg['TimeStamp']))
         ipaddr = reg['IPAddress']['item'][0]['IP']
@@ -309,13 +309,13 @@ def checkreg(req):
         teams.messages.create(roomId=space, markdown=msg)
 
     elif username:
-        for res in get_phones_by_user(username):
+        for res in 'find phones for this user how':
             phones.append(res)
         reg = ris.checkRegistration(phones, subs)
         status = reg['Status']
         timestamp = time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(reg['TimeStamp']))
         ipaddr = reg['IPAddress']['item'][0]['IP']
-        user = get_user_by_username(username)
+        user = 'i have username, it would be great to get some more info about the user'
         firstName = user['firstName']
         lastName = user['lastName']
         msg = format_msg('success_checkreg')
@@ -324,7 +324,7 @@ def checkreg(req):
         teams.messages.create(roomId=space, markdown=msg)
     
     elif number:
-        res, error = get_phones_by_number(number)
+        res, error = '''i have the number so whatphones dey?'''
         if error:
             msg = format_msg('fail_checkreg') + error
             teams.messages.create(roomId=space, markdown=msg)
@@ -341,7 +341,7 @@ def checkreg(req):
                 teams.messages.create(roomId=space, markdown=msg)
 
     elif firstname and lastname:
-        res, error = get_phones_by_firstlast(firstname, lastname)
+        res, error = '''i have the persons name, so what phones do they have?'''
         if error:
             msg = format_msg('fail_checkreg') + error
             teams.messages.create(roomId=space, markdown=msg)
@@ -378,9 +378,9 @@ def screenshot(req):
         else:
             for phone in res:
                 phones.append(phone['mac'])
-                reg = ris.checkRegistration(phones, subs)
+                reg = '''i need the ip from the mac'''
                 ip = reg['IPAddress']['item'][0]['IP']
-                download_screenshot(ip)
+                '''lets download the screenshot so we can send it to webex'''
                 msg = format_msg('success_screenshot')
                 files.append('/'+full+'/img.png')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -395,7 +395,7 @@ def screenshot(req):
             reg = ris.checkRegistration(phone, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                download_screenshot(ip)
+                '''lets download the screenshot so we can send it to webex'''
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -409,7 +409,7 @@ def screenshot(req):
             reg = ris.checkRegistration(phones, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                download_screenshot(ip)
+                '''lets download the screenshot so we can send it to webex'''
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -438,10 +438,10 @@ def phonestatus(req):
         else:
             for phone in res:
                 phones.append(phone['mac'])
-                reg = ris.checkRegistration(phones, subs)
+                reg = '''i need to get the ip address from the mac address'''
                 for item in reg['IPAddress']['item']:
                     ip = item['IP']
-                    phone = scrape.allDetails(ip)
+                    phone = '''let's scrape the web interface of the phone for more details, no? '''
                     sn = phone['sn']
                     dn = phone['dn']
                     mac = phone['mac_address']
@@ -465,7 +465,7 @@ def phonestatus(req):
             reg = ris.checkRegistration(res, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                phone = scrape.allDetails(ip)
+                phone = '''let's scrape the web interface of the phone for more details, no? '''
                 sn = phone['sn']
                 dn = phone['dn']
                 mac = phone['mac_address']
@@ -489,7 +489,7 @@ def phonestatus(req):
             reg = ris.checkRegistration(phones, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                phone = scrape.allDetails(ip)
+                phone = '''let's scrape the web interface of the phone for more details, no? '''
                 sn = phone['sn']
                 dn = phone['dn']
                 mac = phone['mac_address']
@@ -515,9 +515,9 @@ def logs(req):
     time_period = req['queryResult']['parameters']['time-period']
     update_db(req)
     if duration:
-        log.selectLogFilesRel(service=service, duration=duration)
+        log.selectLogFunctionToUseHere(service=service, duration=duration)
     elif time_period:
-        log.selectLogFilesAbs(service=service, time_period=time_period)
+        log.selectLogFunctionToUseHere(service=service, time_period=time_period)
 
 def default(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
