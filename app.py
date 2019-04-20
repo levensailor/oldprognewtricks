@@ -3,26 +3,19 @@ import os
 import csv
 import random
 import time
+import json
+import shutil
+import requests
 from ciscoaxl import axl
 from ciscoris import ris
 from logs import logcollection
 import boto3
 from botocore.exceptions import ClientError
-import shutil
 from webexteamssdk import WebexTeamsAPI
-import json
 from requests.auth import HTTPBasicAuth
-import requests
 from phonescrape import scrape
 from pprint import pformat
 from flask import Flask, jsonify, request, abort, Response, make_response
-
-dynamodb = boto3.resource('dynamodb', region_name="us-east-1")
-table = dynamodb.Table('newtricks')
-'''
-sftp://10.131.202.249
-sftpuser:devnet
-'''
 
 '''
 Setup Flask webhook
@@ -30,51 +23,57 @@ Setup Flask webhook
 app = Flask(__name__)
 full  = os.path.abspath(os.path.dirname('.'))
 
-
-
 '''
-Setup Caxl AXL
+TODO - Enter Webex Teams token:
 '''
 token = 'Y2NjOGZmZDctYzk3Yi00OWM1LWEwNzYtZDA1NmJhODZjMDI3ZmQ4ODFiZDQtN2Vi_PF84_2b89525d-d39b-4b8b-8814-2b235d777a10'
-cucm = 'yo-dhzgwgcrwj.dynamic-m.com'
-username = 'administrator'
-password = 'D3vn3t2019'
-ctiuser = 'ctiuser'
-sftpserver = '10.131.202.249'
-sftpuser = 'sftpuser'
-sftppassword = 'devnet'
-version = '12.5'
-wsdl = 'https://s3-us-west-2.amazonaws.com/devnet2019/schema/12.5/AXLAPI.wsdl'
-axl = axl(username=username,password=password,wsdl=wsdl,cucm=cucm,cucm_version=version)
-ris = ris(username=username,password=password,cucm=cucm,cucm_version=version)
-log = logcollection(username=username, password=password, cucm=cucm, sftpserver=sftpserver, sftpusername=sftpuser, sftppassword=sftppassword)
-
-'''
-Setup Webex Teams
-'''
 teams = WebexTeamsAPI(access_token=token)
 
+'''
+Cisco CUCM service endpoints: AXL, RIS, CTI, Log Collection
+'''
+cucm = 'yo-dhzgwgcrwj.dynamic-m.com'
+wsdl = 'https://s3-us-west-2.amazonaws.com/devnet2019/schema/12.5/AXLAPI.wsdl'
+version = '12.5'
+
+axluser, axlpassword = ('administrator', 'D3vn3t2019')
+axl = axl(username=axluser,password=axlpassword,wsdl=wsdl,cucm=cucm,cucm_version=version)
+
+risuser, rispassword = ('administrator', 'D3vn3t2019')
+ris = ris(username=risuser,password=rispassword,cucm=cucm,cucm_version=version)
+
+ctiuser, ctipassword = ('ctiuser', 'D3vn3t2019')
+
+sftpserver, sftpuser, sftppassword = ('yo-dhzgwgcrwj.dynamic-m.com', 'sftpuser', 'devnet')
+log = logcollection(username=axluser, password=axlpassword, cucm=cucm, sftpserver=sftpserver, sftpusername=sftpuser, sftppassword=sftppassword)
+
+'''
+Amazon Dynamo will be used as a simple stack for logs
+'''
+dynamodb = boto3.resource('dynamodb', region_name="us-west-2")
+table = dynamodb.Table('cache')
 
 def update_db(req):
     roomId = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
-    responseId = req['responseId']
     try:
         response = table.update_item(
         Key={
-            'token': token
+            'devnet': 'create'
         },
-        UpdateExpression="set roomId = :t, set responseId = :r",
+        UpdateExpression="set roomId = :r, wbxtoken = :t",
         ExpressionAttributeValues={
-            ':t': roomId,
-            ':r': responseId
+            ':r': roomId,
+            ':t': token
         },
         ReturnValues="UPDATED_NEW"
         )
         return response
-        
     except ClientError as e:
         return e.response['Error']['Message']
 
+'''
+Responses to intents are randomized for a human element
+'''
 def format_msg(result):
     success_fetchnumber = ["Dogo got you 👌🏽", "Dogo found dis 🔍", "Here what dogo found 👅"]
     fail_fetchnumber = ["Dogo not found ❌", "Dogo cannot find any 📟", "No numbers Dogo found 📞"]
@@ -116,6 +115,10 @@ def format_msg(result):
     else:
         return
 
+'''
+UTILITY FUNCTION
+Return associated devices for a given username
+'''
 def get_phones_by_user(username):
     error = None
     phones = []
@@ -130,6 +133,10 @@ def get_phones_by_user(username):
         error = {'No devices found!'}
         return error
 
+'''
+UTILITY FUNCTION
+Return associated devices for a given first and last name
+'''
 def get_phones_by_firstlast(firstname, lastname):
     error = None
     phones = []
@@ -147,22 +154,10 @@ def get_phones_by_firstlast(firstname, lastname):
                 error = {'No devices found!'}
                 return error
 
-def get_user_by_username(username):
-    error = None
-    res = axl.get_user(user_id=username)
-    if res['success']:
-        user = {}
-        user['associatedDevices'] = res['response']['associatedDevices'][0]
-        user['firstName'] = res['response']['firstName']
-        user['lastName'] = res['response']['lastName']
-        user['primaryExtension'] = res['response']['primaryExtension']['pattern']
-        user['telephoneNumber'] = res['response']['telephoneNumber']
-        user['directoryUri'] = res['response']['directoryUri']
-        return user, error
-    else:
-        error = {'Something happened!'}
-        return error
-
+'''
+UTILITY FUNCTION
+Return phones for a given number. Try "equals" before falling back to "contains". 
+'''
 def get_phones_by_number(number):
     error = None
     phones = []
@@ -192,18 +187,68 @@ def get_phones_by_number(number):
             error = f'''{number} not found'''
     return phones, error
 
+'''
+UTILITY FUNCTION
+Returns user info for a givne username
+'''
+def get_user_by_username(username):
+    error = None
+    res = axl.get_user(user_id=username)
+    if res['success']:
+        user = {}
+        user['associatedDevices'] = res['response']['associatedDevices'][0]
+        user['firstName'] = res['response']['firstName']
+        user['lastName'] = res['response']['lastName']
+        user['primaryExtension'] = res['response']['primaryExtension']['pattern']
+        user['telephoneNumber'] = res['response']['telephoneNumber']
+        user['directoryUri'] = res['response']['directoryUri']
+        return user, error
+    else:
+        error = {'Something happened!'}
+        return error
+
+'''
+UTILITY FUNCTION
+Returns all subscribers with CallManager service running
+'''
 def get_subs():
     nodes = axl.listProcessNodes()
     if nodes['success']:
         return nodes['response']
 
+'''
+UTILITY FUNCTION
+CTI authenticated screenshot retrieval
+'''
 def download_screenshot(ip):
     url = "https://"+ip+"/CGI/Screenshot"
-    r = requests.get(url, auth=HTTPBasicAuth(ctiuser, password), verify=False, stream=True)
+    r = requests.get(url, auth=HTTPBasicAuth(ctiuser, ctipassword), verify=False, stream=True)
     with open('img.png', 'wb') as out_file:
         shutil.copyfileobj(r.raw, out_file)
     del r
 
+'''
+USES AXL
+
+STEP 1: Use the appropriate axl function to fulfill the intent
+'''
+def resetpin(req):
+    space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
+    username = req['queryResult']['parameters']['username']
+    pin = str(int(req['queryResult']['parameters']['pin']))
+    this_update_user = axl.update_user_credentials(username, pin=pin)
+    if this_update_user['success']:
+        msg = format_msg('success_resetpin')
+        teams.messages.create(roomId=space, markdown=msg)
+    else:
+        msg = format_msg('fail_resetpin')
+        teams.messages.create(roomId=space, markdown=msg)
+
+'''
+USES AXL
+
+STEP 2: Use the appropriate axl function to fulfill the intent
+'''
 def fetchnumber(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
     amount = req['queryResult']['parameters']['number']
@@ -236,20 +281,12 @@ def fetchnumber(req):
 
     teams.messages.create(roomId=space, markdown=msg)
 
+'''
+USES RIS
 
-def resetpin(req):
-    space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
-    username = req['queryResult']['parameters']['username']
-    pin = str(int(req['queryResult']['parameters']['pin']))
-    print(pin)
-    this_update_user = axl.update_user_credentials(username, pin=pin)
-    if this_update_user['success']:
-        msg = format_msg('success_resetpin')
-        teams.messages.create(roomId=space, markdown=msg)
-    else:
-        msg = format_msg('fail_resetpin')
-        teams.messages.create(roomId=space, markdown=msg)
-
+STEP 3: Use the appropriate ris function 
+STEP 4: For certain input, some utility functions will be required
+'''
 def checkreg(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
     username = req['queryResult']['parameters']['username']
@@ -309,7 +346,6 @@ def checkreg(req):
             msg = format_msg('fail_checkreg') + error
             teams.messages.create(roomId=space, markdown=msg)
         else:
-            #phones.append(res)
             reg = ris.checkRegistration(res, subs)
             status = reg['Status']
             timestamp = time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(reg['TimeStamp']))
@@ -319,6 +355,12 @@ def checkreg(req):
             msg = msg + f'''👉 Click <a href="https://{ipaddr}">here</a> to manage this phone'''
             teams.messages.create(roomId=space, markdown=msg)
 
+'''
+Uses RIS
+
+STEP 5: Use the appropriate ris function 
+STEP 6: Some utility functions will be required
+'''
 def screenshot(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
     number = req['queryResult']['parameters']['number']
@@ -339,8 +381,8 @@ def screenshot(req):
                 reg = ris.checkRegistration(phones, subs)
                 ip = reg['IPAddress']['item'][0]['IP']
                 download_screenshot(ip)
-                files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
+                files.append('/'+full+'/img.png')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
                 os.remove('/'+full+'/img.png')
 
@@ -357,6 +399,7 @@ def screenshot(req):
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
+
     elif firstname and lastname:
         phones, error = get_phones_by_firstlast(firstname, lastname)
         if error:
@@ -371,6 +414,13 @@ def screenshot(req):
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
 
+'''
+Uses RIS, Phonescrape
+
+STEP 7: Use the appropriate ris function
+STEP 8: Use the appropriate scraping function
+STEP 9: Utility functions will be required
+'''
 def phonestatus(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
     number = req['queryResult']['parameters']['number']
@@ -454,6 +504,11 @@ def phonestatus(req):
                 msg = msg + f''' - dn: {dn}\n- model: {model}\n- sn: {sn}\n- mac: {mac}\n- ip: {ip}\n- mask: {subnet}\n- gw: {gateway}\n- tftp: {tftp}\n- cucm1: {cucm1}\n- firmware: {firmware}'''
                 teams.messages.create(roomId=space, markdown=msg)
 
+'''
+USES LogCollection
+
+STEP 10: Use the appropriate log function
+'''
 def logs(req):
     service = req['queryResult']['parameters']['service']
     duration = str(int(req['queryResult']['parameters']['duration']['amount']))
