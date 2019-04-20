@@ -236,7 +236,7 @@ def resetpin(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
     username = req['queryResult']['parameters']['username']
     pin = str(int(req['queryResult']['parameters']['pin']))
-    this_update_user = axl.update_user_credentials(username, pin=pin)
+    this_update_user = '''lets use axl to reset a pin!'''
     if this_update_user['success']:
         msg = format_msg('success_resetpin')
         teams.messages.create(roomId=space, markdown=msg)
