@@ -35,6 +35,7 @@ Cisco CUCM service endpoints: AXL, RIS, CTI, Log Collection
 cucm = 'yo-dhzgwgcrwj.dynamic-m.com'
 wsdl = 'https://s3-us-west-2.amazonaws.com/devnet2019/schema/12.5/AXLAPI.wsdl'
 version = '12.5'
+nat = True
 
 axluser, axlpassword = ('administrator', 'D3vn3t2019')
 axl = axl(username=axluser,password=axlpassword,wsdl=wsdl,cucm=cucm,cucm_version=version)
@@ -441,7 +442,7 @@ def phonestatus(req):
                 reg = ris.checkRegistration(phones, subs)
                 for item in reg['IPAddress']['item']:
                     ip = item['IP']
-                    phone = scrape.allDetails(ip)
+                    phone = scrape.allDetails(cucm if nat else ip)
                     sn = phone['sn']
                     dn = phone['dn']
                     mac = phone['mac_address']
@@ -465,7 +466,7 @@ def phonestatus(req):
             reg = ris.checkRegistration(res, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                phone = scrape.allDetails(ip)
+                phone = scrape.allDetails(cucm if nat else ip)
                 sn = phone['sn']
                 dn = phone['dn']
                 mac = phone['mac_address']
@@ -489,7 +490,7 @@ def phonestatus(req):
             reg = ris.checkRegistration(phones, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                phone = scrape.allDetails(ip)
+                phone = scrape.allDetails(cucm if nat else ip)
                 sn = phone['sn']
                 dn = phone['dn']
                 mac = phone['mac_address']
