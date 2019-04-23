@@ -26,7 +26,7 @@ full  = os.path.abspath(os.path.dirname('.'))
 '''
 TODO - Enter Webex Teams token:
 '''
-token = 'immatoken'
+token = 'Y2NjOGZmZDctYzk3Yi00OWM1LWEwNzYtZDA1NmJhODZjMDI3ZmQ4ODFiZDQtN2Vi_PF84_2b89525d-d39b-4b8b-8814-2b235d777a10'
 teams = WebexTeamsAPI(access_token=token)
 
 '''
@@ -35,6 +35,7 @@ Cisco CUCM service endpoints: AXL, RIS, CTI, Log Collection
 cucm = 'yo-dhzgwgcrwj.dynamic-m.com'
 wsdl = 'https://s3-us-west-2.amazonaws.com/devnet2019/schema/12.5/AXLAPI.wsdl'
 version = '12.5'
+nat = True
 
 axluser, axlpassword = ('administrator', 'D3vn3t2019')
 axl = axl(username=axluser,password=axlpassword,wsdl=wsdl,cucm=cucm,cucm_version=version)
@@ -236,7 +237,7 @@ def resetpin(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
     username = req['queryResult']['parameters']['username']
     pin = str(int(req['queryResult']['parameters']['pin']))
-    this_update_user = '''lets use axl to reset a pin!'''
+    this_update_user = axl.update_user_credentials(username, pin=pin)
     if this_update_user['success']:
         msg = format_msg('success_resetpin')
         teams.messages.create(roomId=space, markdown=msg)
@@ -265,7 +266,7 @@ def fetchnumber(req):
             elif amount > len(free):
                 did = row[2]
                 if row[0].lower() == city.lower() or row[1] == areacode:
-                    res = axl.add_h323_gateway('ceesco')
+                    res = axl.list_route_plan(pattern=did)
                     if res['success']:
                         if res['response'] == 'Empty':
                             free.append(did)
@@ -299,7 +300,7 @@ def checkreg(req):
 
     if mac:
         phones.append(mac)
-        reg = ris.get_devices('8800stats')
+        reg = ris.checkRegistration(phones, subs)
         status = reg['Status']
         timestamp = time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(reg['TimeStamp']))
         ipaddr = reg['IPAddress']['item'][0]['IP']
@@ -309,13 +310,13 @@ def checkreg(req):
         teams.messages.create(roomId=space, markdown=msg)
 
     elif username:
-        for res in 'find phones for this user how':
+        for res in get_phones_by_user(username):
             phones.append(res)
         reg = ris.checkRegistration(phones, subs)
         status = reg['Status']
         timestamp = time.strftime('%m/%d/%Y %H:%M:%S', time.gmtime(reg['TimeStamp']))
         ipaddr = reg['IPAddress']['item'][0]['IP']
-        user = 'i have username, it would be great to get some more info about the user'
+        user = get_user_by_username(username)
         firstName = user['firstName']
         lastName = user['lastName']
         msg = format_msg('success_checkreg')
@@ -324,7 +325,7 @@ def checkreg(req):
         teams.messages.create(roomId=space, markdown=msg)
     
     elif number:
-        res, error = '''i have the number so whatphones dey?'''
+        res, error = get_phones_by_number(number)
         if error:
             msg = format_msg('fail_checkreg') + error
             teams.messages.create(roomId=space, markdown=msg)
@@ -341,7 +342,7 @@ def checkreg(req):
                 teams.messages.create(roomId=space, markdown=msg)
 
     elif firstname and lastname:
-        res, error = '''i have the persons name, so what phones do they have?'''
+        res, error = get_phones_by_firstlast(firstname, lastname)
         if error:
             msg = format_msg('fail_checkreg') + error
             teams.messages.create(roomId=space, markdown=msg)
@@ -378,9 +379,9 @@ def screenshot(req):
         else:
             for phone in res:
                 phones.append(phone['mac'])
-                reg = '''i need the ip from the mac'''
+                reg = ris.checkRegistration(phones, subs)
                 ip = reg['IPAddress']['item'][0]['IP']
-                '''lets download the screenshot so we can send it to webex'''
+                download_screenshot(ip)
                 msg = format_msg('success_screenshot')
                 files.append('/'+full+'/img.png')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -395,7 +396,7 @@ def screenshot(req):
             reg = ris.checkRegistration(phone, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                '''lets download the screenshot so we can send it to webex'''
+                download_screenshot(ip)
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -409,7 +410,7 @@ def screenshot(req):
             reg = ris.checkRegistration(phones, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                '''lets download the screenshot so we can send it to webex'''
+                download_screenshot(ip)
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -438,10 +439,10 @@ def phonestatus(req):
         else:
             for phone in res:
                 phones.append(phone['mac'])
-                reg = '''i need to get the ip address from the mac address'''
+                reg = ris.checkRegistration(phones, subs)
                 for item in reg['IPAddress']['item']:
                     ip = item['IP']
-                    phone = '''let's scrape the web interface of the phone for more details, no? '''
+                    phone = scrape.allDetails(cucm if nat else ip)
                     sn = phone['sn']
                     dn = phone['dn']
                     mac = phone['mac_address']
@@ -465,7 +466,7 @@ def phonestatus(req):
             reg = ris.checkRegistration(res, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                phone = '''let's scrape the web interface of the phone for more details, no? '''
+                phone = scrape.allDetails(cucm if nat else ip)
                 sn = phone['sn']
                 dn = phone['dn']
                 mac = phone['mac_address']
@@ -489,7 +490,7 @@ def phonestatus(req):
             reg = ris.checkRegistration(phones, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                phone = '''let's scrape the web interface of the phone for more details, no? '''
+                phone = scrape.allDetails(cucm if nat else ip)
                 sn = phone['sn']
                 dn = phone['dn']
                 mac = phone['mac_address']
@@ -515,9 +516,9 @@ def logs(req):
     time_period = req['queryResult']['parameters']['time-period']
     update_db(req)
     if duration:
-        log.selectLogFunctionToUseHere(service=service, duration=duration)
+        log.selectLogFilesRel(service=service, duration=duration)
     elif time_period:
-        log.selectLogFunctionToUseHere(service=service, time_period=time_period)
+        log.selectLogFilesAbs(service=service, time_period=time_period)
 
 def default(req):
     space = req['originalDetectIntentRequest']['payload']['data']['data']['roomId']
