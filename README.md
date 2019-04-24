@@ -9,6 +9,7 @@ code .
 
 #### 2. Create and activate Python Virtual Environment 🐍
 ```bash
+pip3 install virtualenv
 virtualenv newtricks
 source newtricks/bin/activate
 (newtricks) user in ~/oldprognewtricks$ python -V
