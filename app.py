@@ -381,7 +381,7 @@ def screenshot(req):
                 phones.append(phone['mac'])
                 reg = ris.checkRegistration(phones, subs)
                 ip = reg['IPAddress']['item'][0]['IP']
-                download_screenshot(ip)
+                download_screenshot(cucm if nat else ip)
                 msg = format_msg('success_screenshot')
                 files.append('/'+full+'/img.png')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -396,7 +396,7 @@ def screenshot(req):
             reg = ris.checkRegistration(phone, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                download_screenshot(ip)
+                download_screenshot(cucm if nat else ip)
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
@@ -410,7 +410,7 @@ def screenshot(req):
             reg = ris.checkRegistration(phones, subs)
             for item in reg['IPAddress']['item']:
                 ip = item['IP']
-                download_screenshot(ip)
+                download_screenshot(cucm if nat else ip)
                 files.append('/'+full+'/img.png')
                 msg = format_msg('success_screenshot')
                 teams.messages.create(roomId=space, markdown=msg, files=files)
