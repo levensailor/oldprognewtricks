@@ -3,7 +3,6 @@ bs4==0.0.1
 certifi==2019.3.9
 chardet==3.0.4
 ciscoaxl==0.0.1
-ciscosxml==0.0.1
 Click==7.0
 Flask==1.0.2
 future==0.17.1
