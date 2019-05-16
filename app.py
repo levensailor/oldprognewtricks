@@ -26,7 +26,7 @@ full  = os.path.abspath(os.path.dirname('.'))
 '''
 TODO - Enter Webex Teams token:
 '''
-token = 'Y2NjOGZmZDctYzk3Yi00OWM1LWEwNzYtZDA1NmJhODZjMDI3ZmQ4ODFiZDQtN2Vi_PF84_2b89525d-d39b-4b8b-8814-2b235d777a10'
+token = '<your teams token here>'
 teams = WebexTeamsAPI(access_token=token)
 
 '''
