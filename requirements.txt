@@ -17,4 +17,4 @@ soupsieve==1.9
 suds-jurko==0.6
 urllib3==1.23
 webexteamssdk==1.1.1
-Werkzeug==0.15.2
+Werkzeug==0.15.3
